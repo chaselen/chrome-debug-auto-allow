@@ -3,12 +3,19 @@
 <plist version="1.0">
 <dict>
 	<key>Label</key>
-	<string>com.local.cdp-auto-allow</string>
+	<string>com.local.debug-auto-allow</string>
 	<key>ProgramArguments</key>
 	<array>
 		<string>/usr/bin/open</string>
 		<string>-W</string>
-		<string>__CDP_AUTO_ALLOW_APP_PATH__</string>
+		<string>--stdout</string>
+		<string>/tmp/debug-auto-allow.debug.log</string>
+		<string>--stderr</string>
+		<string>/tmp/debug-auto-allow.debug.log</string>
+		<string>__DEBUG_AUTO_ALLOW_APP_PATH__</string>
+		<string>--args</string>
+		<string>--interval</string>
+		<string>0.4</string>
 	</array>
 	<key>RunAtLoad</key>
 	<true/>
@@ -17,17 +24,8 @@
 	<key>ThrottleInterval</key>
 	<integer>5</integer>
 	<key>StandardOutPath</key>
-	<string>/tmp/cdp-auto-allow.debug.log</string>
+	<string>/tmp/debug-auto-allow.debug.log</string>
 	<key>StandardErrorPath</key>
-	<string>/tmp/cdp-auto-allow.debug.log</string>
-	<key>EnvironmentVariables</key>
-	<dict>
-		<key>CDP_AUTO_ALLOW_DRY_RUN</key>
-		<string>0</string>
-		<key>CDP_AUTO_ALLOW_FOCUS_STEAL</key>
-		<string>0</string>
-		<key>CDP_AUTO_ALLOW_INTERVAL</key>
-		<string>0.4</string>
-	</dict>
+	<string>/tmp/debug-auto-allow.debug.log</string>
 </dict>
 </plist>

@@ -7,7 +7,7 @@
 ## 安全约束
 
 - 默认只对匹配到的“允许”按钮调用辅助功能点击；不要加入盲按 Return、自动激活 Chrome 或放宽关键词规则的默认行为。
-- 只有用户明确配置 `CDP_AUTO_ALLOW_FOCUS_STEAL=1` 时，才允许启用会激活 Chrome 的点击兜底。
+- 只有用户明确配置 `DEBUG_AUTO_ALLOW_FOCUS_STEAL=1` 时，才允许启用会激活 Chrome 的点击兜底。
 - 不读取或修改 Chrome profile、Cookie、CDP 端口设置，不启动 MCP，也不自动开启远程调试。
 - 不要在未经用户要求时运行安装、卸载或修改辅助功能 / LaunchAgent 状态的操作。
 - 新增弹窗文案和按钮别名时，同时补充正例或负例 fixture 与 matcher 测试。
