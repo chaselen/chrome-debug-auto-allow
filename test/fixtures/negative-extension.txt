@@ -1,0 +1,1 @@
+An extension wants access to your cookies and site data. Allow Cancel

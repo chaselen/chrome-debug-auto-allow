@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>com.local.cdp-auto-allow</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/usr/bin/open</string>
+		<string>-W</string>
+		<string>__CDP_AUTO_ALLOW_APP_PATH__</string>
+	</array>
+	<key>RunAtLoad</key>
+	<true/>
+	<key>KeepAlive</key>
+	<true/>
+	<key>ThrottleInterval</key>
+	<integer>5</integer>
+	<key>StandardOutPath</key>
+	<string>/tmp/cdp-auto-allow.debug.log</string>
+	<key>StandardErrorPath</key>
+	<string>/tmp/cdp-auto-allow.debug.log</string>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>CDP_AUTO_ALLOW_DRY_RUN</key>
+		<string>0</string>
+		<key>CDP_AUTO_ALLOW_FOCUS_STEAL</key>
+		<string>0</string>
+		<key>CDP_AUTO_ALLOW_INTERVAL</key>
+		<string>0.4</string>
+	</dict>
+</dict>
+</plist>
