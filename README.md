@@ -72,7 +72,7 @@ tail -f /tmp/debug-auto-allow.debug.log
 | `DEBUG_AUTO_ALLOW_DRY_RUN` | `0` | 设为 `1` 时只记录将点击的按钮，不执行点击 |
 | `DEBUG_AUTO_ALLOW_FOCUS_STEAL` | `0` | 设为 `1` 时，只有无焦点直接点击失败后才激活 Chrome 并重试明确匹配到的允许按钮 |
 | `DEBUG_AUTO_ALLOW_INTERVAL` | `0.4` | 轮询间隔，范围为 0.2–5 秒 |
-| `DEBUG_AUTO_ALLOW_APP_PATH` | `~/Applications/Debug Auto Allow.app` | 自定义安装目录；应用名需保持 `Debug Auto Allow.app` |
+| `DEBUG_AUTO_ALLOW_APP_PATH` | `~/Applications/Debug Auto Allow.app` | 自定义安装绝对路径；应用名需保持 `Debug Auto Allow.app` |
 
 例如，启用常驻 dry-run：
 
