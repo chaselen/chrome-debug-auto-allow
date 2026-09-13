@@ -15,7 +15,7 @@ fail() {
 	exit 1
 }
 
-stop_applet() {
+stop_app() {
 	/usr/bin/pkill -TERM -x DebugAutoAllow >/dev/null 2>&1 || true
 	local attempt=0
 	while /usr/bin/pgrep -x DebugAutoAllow >/dev/null 2>&1 && [[ "$attempt" -lt 20 ]]; do
@@ -42,7 +42,7 @@ restore_agent() {
 	local exit_code=$?
 	trap - EXIT HUP INT TERM
 	if [[ "$RESTORE_AGENT" -eq 1 ]]; then
-		if ! stop_applet; then
+		if ! stop_app; then
 			printf '\n错误：dry-run 应用仍在运行，未能安全恢复 LaunchAgent。\n' >&2
 			exit_code=1
 		elif /bin/launchctl bootstrap "$DOMAIN" "$PLIST_PATH"; then
@@ -51,7 +51,7 @@ restore_agent() {
 			printf '\n错误：无法自动恢复 LaunchAgent，请运行 scripts/install.sh。\n' >&2
 			exit_code=1
 		fi
-	elif [[ "$DRY_RUN_STARTED" -eq 1 ]] && ! stop_applet; then
+	elif [[ "$DRY_RUN_STARTED" -eq 1 ]] && ! stop_app; then
 		printf '\n错误：dry-run 应用仍在运行，请手动运行 scripts/uninstall.sh 停止。\n' >&2
 		exit_code=1
 	fi
@@ -67,7 +67,7 @@ if /bin/launchctl print "$SERVICE_TARGET" >/dev/null 2>&1; then
 	RESTORE_AGENT=1
 	/bin/launchctl bootout "$DOMAIN" "$PLIST_PATH"
 fi
-stop_applet || fail "无法停止此前运行的 Debug Auto Allow。"
+stop_app || fail "无法停止此前运行的 Debug Auto Allow。"
 
 printf '前台 dry-run 已启动。日志见 /tmp/debug-auto-allow.debug.log；按 Ctrl-C 结束。\n'
 DRY_RUN_STARTED=1

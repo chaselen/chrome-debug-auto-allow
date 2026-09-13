@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SCRIPT_PATH="$ROOT_DIR/scripts/debug-auto-allow.applescript"
+SWIFT_PATH="$ROOT_DIR/scripts/debug-auto-allow.swift"
 PLIST_TEMPLATE="$ROOT_DIR/launchd/com.local.debug-auto-allow.plist"
 LABEL="com.local.debug-auto-allow"
 APP_PATH="${DEBUG_AUTO_ALLOW_APP_PATH:-$HOME/Applications/Debug Auto Allow.app}"
@@ -30,11 +30,11 @@ case "$(/usr/bin/uname -s)" in
 	*) fail "本项目只支持 macOS。"
 esac
 
-for required_command in osacompile codesign open launchctl plutil shasum awk; do
+for required_command in swiftc codesign open launchctl plutil shasum awk; do
 	require_command "$required_command"
 done
 [[ -x /usr/libexec/PlistBuddy ]] || fail "找不到 /usr/libexec/PlistBuddy。"
-[[ -f "$SCRIPT_PATH" ]] || fail "找不到 AppleScript 源码：$SCRIPT_PATH"
+[[ -f "$SWIFT_PATH" ]] || fail "找不到 Swift 源码：$SWIFT_PATH"
 [[ -f "$PLIST_TEMPLATE" ]] || fail "找不到 LaunchAgent 模板：$PLIST_TEMPLATE"
 
 case "$APP_PATH" in
@@ -46,14 +46,13 @@ case "$APP_PATH" in
 esac
 [[ "$DRY_RUN" == 0 || "$DRY_RUN" == 1 ]] || fail "DEBUG_AUTO_ALLOW_DRY_RUN 只能是 0 或 1。"
 [[ "$FOCUS_STEAL" == 0 || "$FOCUS_STEAL" == 1 ]] || fail "DEBUG_AUTO_ALLOW_FOCUS_STEAL 只能是 0 或 1。"
-[[ "$INTERVAL" =~ ^([0-9]+([.][0-9]*)?|[.][0-9]+)$ ]] || fail "DEBUG_AUTO_ALLOW_INTERVAL 必须是 0.2–5 之间的数字。"
+[[ "$INTERVAL" =~ ^([0-9]+([.][0-9]*)?|[.][0-9]+)$ ]] || fail "DEBUG_AUTO_ALLOW_INTERVAL 必须是数字。"
 /usr/bin/awk -v interval="$INTERVAL" 'BEGIN { exit !(interval >= 0.2 && interval <= 5) }' || fail "DEBUG_AUTO_ALLOW_INTERVAL 必须在 0.2–5 秒之间。"
 
 APP_PARENT="$(/usr/bin/dirname "$APP_PATH")"
 BUILD_APP_PATH="${APP_PATH%.app}.build.$$.app"
 BUILD_APP_INFO="$BUILD_APP_PATH/Contents/Info.plist"
 BUILD_APP_EXECUTABLE="$BUILD_APP_PATH/Contents/MacOS/DebugAutoAllow"
-BUILD_APPLET="$BUILD_APP_PATH/Contents/MacOS/applet"
 PLIST_TMP=""
 AGENT_WAS_LOADED=0
 
@@ -72,7 +71,7 @@ cleanup_install() {
 }
 trap cleanup_install EXIT
 
-stop_applet() {
+stop_app() {
 	/usr/bin/pkill -TERM -x DebugAutoAllow >/dev/null 2>&1 || true
 	local attempt=0
 	while /usr/bin/pgrep -x DebugAutoAllow >/dev/null 2>&1 && [[ "$attempt" -lt 20 ]]; do
@@ -84,7 +83,7 @@ stop_applet() {
 	fi
 }
 
-SCRIPT_HASH="$(/usr/bin/shasum -a 256 "$SCRIPT_PATH" | /usr/bin/awk '{ print $1 }')"
+SCRIPT_HASH="$(/usr/bin/shasum -a 256 "$SWIFT_PATH" | /usr/bin/awk '{ print $1 }')"
 OLD_SCRIPT_HASH=""
 if [[ -f "$HASH_PATH" ]]; then OLD_SCRIPT_HASH="$(/bin/cat "$HASH_PATH")"; fi
 APP_REBUILT=0
@@ -93,22 +92,31 @@ if [[ ! -d "$APP_PATH" || "$SCRIPT_HASH" != "$OLD_SCRIPT_HASH" ]] \
 	|| ! /usr/bin/codesign --verify --deep --strict "$APP_PATH" >/dev/null 2>&1; then
 	/bin/mkdir -p "$APP_PARENT"
 	/bin/rm -rf "$BUILD_APP_PATH"
-	/usr/bin/osacompile -s -o "$BUILD_APP_PATH" "$SCRIPT_PATH"
-	[[ -x "$BUILD_APPLET" ]] || fail "osacompile 未生成预期的 applet 可执行文件。"
-	/bin/mv "$BUILD_APPLET" "$BUILD_APP_EXECUTABLE"
-	/usr/libexec/PlistBuddy -c 'Set :CFBundleExecutable DebugAutoAllow' "$BUILD_APP_INFO"
-	/usr/libexec/PlistBuddy -c 'Set :CFBundleIdentifier com.local.DebugAutoAllow' "$BUILD_APP_INFO" 2>/dev/null || /usr/libexec/PlistBuddy -c 'Add :CFBundleIdentifier string com.local.DebugAutoAllow' "$BUILD_APP_INFO"
-	/usr/libexec/PlistBuddy -c 'Set :LSUIElement true' "$BUILD_APP_INFO" 2>/dev/null || /usr/libexec/PlistBuddy -c 'Add :LSUIElement bool true' "$BUILD_APP_INFO"
-	/usr/bin/plutil -replace CFBundleName -string 'Debug Auto Allow' "$BUILD_APP_INFO"
+	/bin/mkdir -p "$BUILD_APP_PATH/Contents/MacOS" "$BUILD_APP_PATH/Contents/Resources"
+
+	/usr/bin/swiftc -O -o "$BUILD_APP_EXECUTABLE" "$SWIFT_PATH" \
+		-framework AppKit -framework ApplicationServices
+	[[ -x "$BUILD_APP_EXECUTABLE" ]] || fail "swiftc 未生成预期的可执行文件。"
+
+	/usr/bin/plutil -create xml1 "$BUILD_APP_INFO"
+	/usr/libexec/PlistBuddy -c 'Add :CFBundleExecutable string DebugAutoAllow' "$BUILD_APP_INFO"
+	/usr/libexec/PlistBuddy -c 'Add :CFBundleIdentifier string com.local.DebugAutoAllow' "$BUILD_APP_INFO"
+	/usr/libexec/PlistBuddy -c 'Add :CFBundleName string Debug Auto Allow' "$BUILD_APP_INFO"
+	/usr/libexec/PlistBuddy -c 'Add :CFBundlePackageType string APPL' "$BUILD_APP_INFO"
+	/usr/libexec/PlistBuddy -c 'Add :CFBundleShortVersionString string 1.0' "$BUILD_APP_INFO"
+	/usr/libexec/PlistBuddy -c 'Add :CFBundleVersion string 1' "$BUILD_APP_INFO"
+	/usr/libexec/PlistBuddy -c 'Add :LSUIElement bool true' "$BUILD_APP_INFO"
+	/usr/libexec/PlistBuddy -c 'Add :NSHighResolutionCapable bool true' "$BUILD_APP_INFO"
+
 	/usr/bin/codesign --force --deep --sign - "$BUILD_APP_PATH"
 	/usr/bin/codesign --verify --deep --strict "$BUILD_APP_PATH"
 	APP_REBUILT=1
 fi
 
 if [[ "$APP_REBUILT" -eq 1 ]]; then
-	printf '检测到 AppleScript 更新或应用无效，已准备经过签名验证的新构建。\n'
+	printf '检测到源码更新或应用无效，已准备经过签名验证的新构建。\n'
 else
-	printf 'AppleScript 未变化，复用现有应用：%s\n' "$APP_PATH"
+	printf '源码未变化，复用现有应用：%s\n' "$APP_PATH"
 fi
 
 /bin/mkdir -p "$PLIST_DIR"
@@ -135,7 +143,7 @@ if [[ "$AGENT_WAS_LOADED" -eq 1 ]]; then
 elif [[ -f "$PLIST_PATH" ]]; then
 	/bin/launchctl bootout "$DOMAIN" "$PLIST_PATH" >/dev/null 2>&1 || true
 fi
-stop_applet
+stop_app
 
 if [[ "$APP_REBUILT" -eq 1 ]]; then
 	/bin/rm -rf "$APP_PATH"

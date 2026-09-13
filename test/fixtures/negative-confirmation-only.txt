@@ -1,1 +1,0 @@
-This app may access saved data and cookies. Allow Cancel
