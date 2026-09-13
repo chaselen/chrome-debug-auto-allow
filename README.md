@@ -86,7 +86,27 @@ DEBUG_AUTO_ALLOW_DRY_RUN=1 ./scripts/install.sh
 DEBUG_AUTO_ALLOW_DRY_RUN=0 ./scripts/install.sh
 ```
 
-应用仅在窗口文案同时包含一项远程调试关键词和一项确认语义，并且存在名称精确匹配的允许按钮时才会尝试操作。普通网页提示、只有单类关键词的窗口和名称不匹配的按钮都不会触发点击。重复操作间隔至少 3 秒。
+## 自动处理的 Chrome 界面
+
+Chrome 144 及以上版本在收到远程调试连接请求时会显示授权弹窗；连接建立后，浏览器还会显示自动化控制横幅。下图来自 Chrome 官方文档，展示了开启远程调试、确认连接和显示横幅的真实界面流程。本工具只处理其中的授权弹窗和连接后的横幅；不会替用户开启远程调试。
+
+![Chrome DevTools 远程调试流程：连接授权弹窗与连接后的自动化控制横幅](docs/images/chrome-devtools-mcp-remote-debugging-flow.png)
+
+*图片来源：[Chrome for Developers：Let your Coding Agent debug your browser session with Chrome DevTools MCP](https://developer.chrome.com/blog/chrome-devtools-mcp-debug-your-browser-session)，CC BY 4.0。*
+
+### 远程调试授权弹窗
+
+- 只识别文案同时包含远程调试关键词和授权语义的弹窗，例如提到外部应用请求控制浏览器会话、访问保存的数据或 Cookie，并前往任意网址。
+- 必须找到名称精确匹配的“Allow/允许”等按钮才会点击。若授权弹窗出现在未命名的独立窗口中，还要求同时找到名称精确匹配的“Cancel/取消”按钮。
+- 普通网页提示、通知或扩展权限弹窗不属于处理目标；只有“Allow/允许”按钮或只有远程调试字样都不足以触发点击。
+
+### 自动化控制横幅
+
+- 只处理 Chrome、Chrome Canary 或 Chromium 的 info bar 辅助功能节点；同一节点中还必须出现已知提示文案，例如“Chrome is being controlled by automated test software”或“Chrome 正受到自动测试软件的控制”。
+- 必须在该节点内找到名称精确匹配的“Close/关闭”按钮（通常显示为横幅右侧的叉号）才会收起横幅。
+- 不会点击“Turn off in settings/在设置中关闭”。横幅文案、info bar 标识或精确关闭按钮任一不匹配时，脚本都不会操作。
+
+两类操作的重复触发间隔至少 3 秒。
 
 ## 与 Grok / Chrome DevTools MCP 配合
 
