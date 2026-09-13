@@ -33,7 +33,8 @@ enum Matchers {
   static let dismissButtonNames = ["Close", "关闭", "關閉"]
 
   static let maximumTreeDepth = 9
-  static let minimumActionInterval: TimeInterval = 3
+  // Keep short so Allow → automation banner can be handled back-to-back.
+  static let minimumActionInterval: TimeInterval = 1
 }
 
 final class AutoAllowApp: NSObject {

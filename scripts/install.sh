@@ -152,7 +152,6 @@ if [[ "$APP_REBUILT" -eq 1 ]]; then
 	printf '%s\n' "$SCRIPT_HASH" > "$HASH_PATH.tmp"
 	/bin/mv -f "$HASH_PATH.tmp" "$HASH_PATH"
 	printf '已构建并签名：%s\n' "$APP_PATH"
-	printf '应用重建会改变代码哈希；如辅助功能权限失效，请移除旧条目并重新添加该应用。\n'
 fi
 
 /bin/mv -f "$PLIST_TMP" "$PLIST_PATH"
@@ -165,4 +164,21 @@ printf 'LaunchAgent 已启动：%s\n' "$SERVICE_TARGET"
 printf '日志路径：/tmp/debug-auto-allow.debug.log\n'
 if [[ "$DRY_RUN" == 1 ]]; then
 	printf '当前为常驻 dry-run；再次以 DEBUG_AUTO_ALLOW_DRY_RUN=0 运行安装脚本即可切回实际点击。\n'
+fi
+
+if [[ "$APP_REBUILT" -eq 1 ]]; then
+	printf '\n'
+	printf '======= 需要重新授予辅助功能权限 =======\n'
+	printf '应用刚重新编译，代码签名已变化，旧授权通常会失效。\n'
+	printf '请按下列步骤操作：\n'
+	printf '  1. 打开「系统设置 → 隐私与安全性 → 辅助功能」\n'
+	printf '  2. 若列表中已有 Debug Auto Allow，先移除旧条目\n'
+	printf '  3. 点击添加，按 ⌘⇧G，输入：\n'
+	printf '     %s\n' "$APP_PATH"
+	printf '  4. 打开 Debug Auto Allow 的开关\n'
+	printf '  5. 用下面命令确认日志出现 ax-trusted=true：\n'
+	printf '     tail -f /tmp/debug-auto-allow.debug.log\n'
+	printf '======================================\n'
+else
+	printf '\n若弹窗或横幅无反应，请确认辅助功能已启用本应用，且日志中为 ax-trusted=true。\n'
 fi
