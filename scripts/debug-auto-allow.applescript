@@ -1,8 +1,11 @@
 property browserProcessNames : {"Google Chrome", "Google Chrome Canary", "Chromium"}
 property requiredTerms : {"remote debugging", "DevTools", "Developer Tools", "CDP", "chrome-devtools", "MCP", "remote debugging connection", "another program is trying", "远程调试", "遠端偵錯", "遠端調試"}
 property confirmationTerms : {"wants full control", "debug it", "saved data", "cookies and site data", "trusted apps", "external app", "navigate to any URL", "完全控制", "调试", "調試", "已保存的数据", "已儲存的資料", "可信的应用", "可信的應用"}
+property automationBannerTerms : {"Chrome is being controlled by automated test software", "Chrome 正受到自动测试软件的控制", "Chrome 目前受到自動測試軟體控制"}
 property allowButtonNames : {"Allow", "允许", "允許", "OK", "确定", "確定", "確認", "好"}
 property denyButtonNames : {"Cancel", "取消", "Deny", "拒绝", "拒絕"}
+property infobarNames : {"Infobar", "Info bar", "Infobar Container", "信息栏", "資訊欄", "資訊列"}
+property dismissButtonNames : {"Close", "关闭", "關閉"}
 property minimumActionInterval : 3
 property maximumTreeDepth : 9
 property dryRunEnabled : false
@@ -69,6 +72,10 @@ on matchesDialogTerms(dialogText)
 	return hasRequiredTerm and hasConfirmationTerm
 end matchesDialogTerms
 
+on matchesAutomationInfobar(markerText, bannerText, buttonLabel)
+	return my textIsOneOf(markerText, my infobarNames) and my containsAny(bannerText, my automationBannerTerms) and my textIsOneOf(buttonLabel, my dismissButtonNames)
+end matchesAutomationInfobar
+
 on containsAny(theText, termList)
 	set haystack to theText as text
 	repeat with termRef in termList
@@ -118,11 +125,55 @@ on scanBrowsers()
 					if (count of sheetRefs) is 0 then
 						my inspectStandaloneWindow(currentWindow, processRef, processName)
 					end if
+
+					my inspectAutomationBanner(currentWindow, processRef, processName)
 				end repeat
 			end if
 		end repeat
 	end tell
 end scanBrowsers
+
+on inspectAutomationBanner(theWindow, processRef, processName)
+	my inspectAutomationInfobar(theWindow, processRef, processName, 0)
+end inspectAutomationBanner
+
+on inspectAutomationInfobar(theElement, processRef, processName, currentDepth)
+	if currentDepth > maximumTreeDepth then return false
+	set elementRole to ""
+	tell application "System Events"
+		try
+			set elementRole to (role of theElement) as text
+		end try
+	end tell
+	if elementRole is "AXWebArea" or elementRole is "AXDocument" then return false
+
+	set infobarLabel to my matchingExactLabel(theElement, my infobarNames)
+	if infobarLabel is not missing value then
+		set bannerText to my collectAccessibilityText(theElement, 0)
+		set buttonRefs to my collectButtonReferences(theElement, 0)
+		repeat with buttonRef in buttonRefs
+			set currentButton to contents of buttonRef
+			set dismissButtonLabel to my matchingExactLabel(currentButton, my dismissButtonNames)
+			if dismissButtonLabel is not missing value then
+				if my matchesAutomationInfobar(infobarLabel, bannerText, dismissButtonLabel) then
+					my dismissAutomationBanner(currentButton, processRef, processName)
+					return true
+				end if
+			end if
+		end repeat
+	end if
+
+	set childRefs to {}
+	tell application "System Events"
+		try
+			set childRefs to UI elements of theElement
+		end try
+	end tell
+	repeat with childRef in childRefs
+		if my inspectAutomationInfobar(contents of childRef, processRef, processName, currentDepth + 1) then return true
+	end repeat
+	return false
+end inspectAutomationInfobar
 
 on inspectStandaloneWindow(theWindow, processRef, processName)
 	set windowSubrole to ""
@@ -224,6 +275,11 @@ on collectButtonReferences(theElement, currentDepth)
 end collectButtonReferences
 
 on elementHasExactLabel(theElement, expectedLabels)
+	set matchedLabel to my matchingExactLabel(theElement, expectedLabels)
+	return matchedLabel is not missing value
+end elementHasExactLabel
+
+on matchingExactLabel(theElement, expectedLabels)
 	set foundLabels to {}
 	tell application "System Events"
 		try
@@ -242,10 +298,10 @@ on elementHasExactLabel(theElement, expectedLabels)
 
 	repeat with foundLabelRef in foundLabels
 		set foundLabel to contents of foundLabelRef as text
-		if my textIsOneOf(foundLabel, expectedLabels) then return true
+		if my textIsOneOf(foundLabel, expectedLabels) then return foundLabel
 	end repeat
-	return false
-end elementHasExactLabel
+	return missing value
+end matchingExactLabel
 
 on performApproval(targetButton, processRef, processName, containerKind)
 	if cooldownTicksRemaining > 0 then return
@@ -273,6 +329,33 @@ on performApproval(targetButton, processRef, processName, containerKind)
 		end if
 	end try
 end performApproval
+
+on dismissAutomationBanner(targetButton, processRef, processName)
+	if cooldownTicksRemaining > 0 then return
+	set cooldownTicksRemaining to cooldownLengthTicks
+
+	if dryRunEnabled then
+		my logMessage("Matched automation info bar in " & processName & "; would click its Close button (dry-run).")
+		return
+	end if
+
+	try
+		tell application "System Events" to click targetButton
+		my logMessage("Dismissed automation info bar in " & processName & " without activating Chrome.")
+	on error clickError number clickErrorNumber
+		if focusStealEnabled then
+			try
+				tell application "System Events" to set frontmost of processRef to true
+				tell application "System Events" to click targetButton
+				my logMessage("Dismissed automation info bar in " & processName & " after explicit focus-steal fallback.")
+			on error retryError number retryErrorNumber
+				my logMessage("Dismissal failed in " & processName & " (" & (retryErrorNumber as text) & "): " & retryError)
+			end try
+		else
+			my logMessage("Dismissal failed in " & processName & " (" & (clickErrorNumber as text) & "); retrying after cooldown: " & clickError)
+		end if
+	end try
+end dismissAutomationBanner
 
 on logMessage(messageText)
 	log messageText
