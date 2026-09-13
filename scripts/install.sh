@@ -3,11 +3,12 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SWIFT_PATH="$ROOT_DIR/scripts/debug-auto-allow.swift"
+ICON_PATH="$ROOT_DIR/assets/DebugAutoAllow.icns"
 PLIST_TEMPLATE="$ROOT_DIR/launchd/com.local.debug-auto-allow.plist"
 LABEL="com.local.debug-auto-allow"
 APP_PATH="${DEBUG_AUTO_ALLOW_APP_PATH:-$HOME/Applications/Debug Auto Allow.app}"
 STATE_DIR="$HOME/Library/Application Support/Debug Auto Allow"
-HASH_PATH="$STATE_DIR/.script-hash"
+HASH_PATH="$STATE_DIR/.build-hash"
 PLIST_DIR="$HOME/Library/LaunchAgents"
 PLIST_PATH="$PLIST_DIR/$LABEL.plist"
 DOMAIN="gui/$(/usr/bin/id -u)"
@@ -35,6 +36,7 @@ for required_command in swiftc codesign open launchctl plutil shasum awk; do
 done
 [[ -x /usr/libexec/PlistBuddy ]] || fail "找不到 /usr/libexec/PlistBuddy。"
 [[ -f "$SWIFT_PATH" ]] || fail "找不到 Swift 源码：$SWIFT_PATH"
+[[ -f "$ICON_PATH" ]] || fail "找不到应用图标：$ICON_PATH"
 [[ -f "$PLIST_TEMPLATE" ]] || fail "找不到 LaunchAgent 模板：$PLIST_TEMPLATE"
 
 case "$APP_PATH" in
@@ -83,12 +85,13 @@ stop_app() {
 	fi
 }
 
-SCRIPT_HASH="$(/usr/bin/shasum -a 256 "$SWIFT_PATH" | /usr/bin/awk '{ print $1 }')"
-OLD_SCRIPT_HASH=""
-if [[ -f "$HASH_PATH" ]]; then OLD_SCRIPT_HASH="$(/bin/cat "$HASH_PATH")"; fi
+BUILD_HASH="$(/usr/bin/shasum -a 256 "$SWIFT_PATH" "$ICON_PATH" | /usr/bin/shasum -a 256 | /usr/bin/awk '{ print $1 }')"
+OLD_BUILD_HASH=""
+if [[ -f "$HASH_PATH" ]]; then OLD_BUILD_HASH="$(/bin/cat "$HASH_PATH")"; fi
 APP_REBUILT=0
-if [[ ! -d "$APP_PATH" || "$SCRIPT_HASH" != "$OLD_SCRIPT_HASH" ]] \
+if [[ ! -d "$APP_PATH" || "$BUILD_HASH" != "$OLD_BUILD_HASH" ]] \
 	|| [[ ! -x "$APP_PATH/Contents/MacOS/DebugAutoAllow" ]] \
+	|| [[ ! -f "$APP_PATH/Contents/Resources/DebugAutoAllow.icns" ]] \
 	|| ! /usr/bin/codesign --verify --deep --strict "$APP_PATH" >/dev/null 2>&1; then
 	/bin/mkdir -p "$APP_PARENT"
 	/bin/rm -rf "$BUILD_APP_PATH"
@@ -97,11 +100,13 @@ if [[ ! -d "$APP_PATH" || "$SCRIPT_HASH" != "$OLD_SCRIPT_HASH" ]] \
 	/usr/bin/swiftc -O -o "$BUILD_APP_EXECUTABLE" "$SWIFT_PATH" \
 		-framework AppKit -framework ApplicationServices
 	[[ -x "$BUILD_APP_EXECUTABLE" ]] || fail "swiftc 未生成预期的可执行文件。"
+	/bin/cp "$ICON_PATH" "$BUILD_APP_PATH/Contents/Resources/DebugAutoAllow.icns"
 
 	/usr/bin/plutil -create xml1 "$BUILD_APP_INFO"
 	/usr/libexec/PlistBuddy -c 'Add :CFBundleExecutable string DebugAutoAllow' "$BUILD_APP_INFO"
 	/usr/libexec/PlistBuddy -c 'Add :CFBundleIdentifier string com.local.DebugAutoAllow' "$BUILD_APP_INFO"
 	/usr/libexec/PlistBuddy -c 'Add :CFBundleName string Debug Auto Allow' "$BUILD_APP_INFO"
+	/usr/libexec/PlistBuddy -c 'Add :CFBundleIconFile string DebugAutoAllow' "$BUILD_APP_INFO"
 	/usr/libexec/PlistBuddy -c 'Add :CFBundlePackageType string APPL' "$BUILD_APP_INFO"
 	/usr/libexec/PlistBuddy -c 'Add :CFBundleShortVersionString string 1.0' "$BUILD_APP_INFO"
 	/usr/libexec/PlistBuddy -c 'Add :CFBundleVersion string 1' "$BUILD_APP_INFO"
@@ -149,7 +154,7 @@ if [[ "$APP_REBUILT" -eq 1 ]]; then
 	/bin/rm -rf "$APP_PATH"
 	/bin/mv "$BUILD_APP_PATH" "$APP_PATH"
 	/bin/mkdir -p "$STATE_DIR"
-	printf '%s\n' "$SCRIPT_HASH" > "$HASH_PATH.tmp"
+	printf '%s\n' "$BUILD_HASH" > "$HASH_PATH.tmp"
 	/bin/mv -f "$HASH_PATH.tmp" "$HASH_PATH"
 	printf '已构建并签名：%s\n' "$APP_PATH"
 fi
