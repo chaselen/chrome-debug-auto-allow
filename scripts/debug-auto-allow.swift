@@ -21,9 +21,13 @@ enum Matchers {
     "完全控制", "调试", "調試", "已保存的数据", "已儲存的資料", "可信的应用", "可信的應用",
   ]
 
+  // Chromium's zh-CN wording changed between the sampled 153 and 154 tags.
+  // https://github.com/chromium/chromium/blob/153.0.8010.57/chrome/app/resources/generated_resources_zh-CN.xtb
+  // https://github.com/chromium/chromium/blob/154.0.8037.99/chrome/app/resources/generated_resources_zh-CN.xtb
   static let automationBannerTerms = [
     "Chrome is being controlled by automated test software",
     "Chrome 正受到自动测试软件的控制",
+    "自动测试软件正在控制 Chrome",
     "Chrome 目前受到自動測試軟體控制",
   ]
 
